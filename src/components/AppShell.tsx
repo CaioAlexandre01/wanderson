@@ -7,6 +7,9 @@ import clsx from "clsx";
 import { Drawer } from "@/components/Drawer";
 import { Header } from "@/components/Header";
 import { useFinanceStore } from "@/store/useFinanceStore";
+import { PinGate } from "@/components/PinGate";
+import { firestoreProvider } from "@/lib/storage/firestoreProvider";
+import { DEVICE_KEY, PIN_KEY } from "@/lib/pin";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -21,13 +24,15 @@ const drawerNavItems = [{ href: "/", label: "Home" }, ...headerNavItems];
 
 export function AppShell({ children }: AppShellProps) {
   const [open, setOpen] = useState(false);
+  const [verified, setVerified] = useState(false);
   const pathname = usePathname();
   const loadFromStorage = useFinanceStore((state) => state.loadFromStorage);
   const resetData = useFinanceStore((state) => state.resetData);
 
   useEffect(() => {
-    loadFromStorage();
-  }, [loadFromStorage]);
+    if (!verified) return;
+    void loadFromStorage();
+  }, [loadFromStorage, verified]);
 
   const navLinks = useMemo(
     () =>
@@ -52,6 +57,10 @@ export function AppShell({ children }: AppShellProps) {
     [pathname]
   );
 
+  if (!verified) {
+    return <PinGate onVerified={() => setVerified(true)} />;
+  }
+
   return (
     <div className="min-h-screen text-foreground">
       <Header navItems={headerNavItems} onMenu={() => setOpen(true)} />
@@ -67,6 +76,9 @@ export function AppShell({ children }: AppShellProps) {
                 );
                 if (!ok) return;
                 await resetData();
+                await firestoreProvider().clear(PIN_KEY);
+                window.localStorage.removeItem(DEVICE_KEY);
+                setVerified(false);
                 setOpen(false);
               }}
               className="w-full rounded-2xl bg-danger px-4 py-3 text-sm font-semibold text-white shadow-[var(--shadow-soft)] transition hover:brightness-110"
